@@ -10193,7 +10193,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   }
   label .req{color:#e0454a;margin-left:2px;}
   label .hint{display:block;font-weight:500;font-size:11px;color:#8ea3ef;margin-top:1px;}
-  label .hint.hint-inline{display:inline;margin-top:0;margin-left:5px;}
+  label .hint.hint-inline{display:block;margin-top:1px;margin-left:0;}
   input[type=text], input[type=number], select, textarea{
     width:100%;
     padding:11px 13px;
@@ -10217,12 +10217,26 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
     cursor:pointer;white-space:nowrap;height:44px;
   }
   .qr-btn:hover{background:#eef2ff;}
-  .two-col{display:flex;gap:12px;}
+  .two-col{display:flex;gap:12px;flex-wrap:wrap;}
+  .two-col .field{flex:1 1 140px;min-width:140px;}
+  .qty-header-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 14px;margin-bottom:6px;}
+  .qty-header-row label{margin-bottom:0;}
+  .shrink-check-row{
+    display:flex;align-items:center;gap:6px;margin:0;cursor:pointer;
+    font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap;
+  }
+  .shrink-check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--primary);cursor:pointer;}
+  .weight-input-row{display:flex;gap:8px;}
+  .weight-input-row input{flex:1;min-width:0;}
+  .weight-input-row select{
+    width:56px;flex-shrink:0;padding:11px 4px;border:1.4px solid var(--border);border-radius:10px;
+    font-size:14px;color:var(--ink);background:#fff;outline:none;font-family:inherit;
+  }
+  .weight-input-row select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(47,86,217,.12);}
   .sub-qty-row{display:flex;gap:10px;}
   .sub-qty-item{flex:1;}
   .sub-qty-label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;font-weight:600;}
   .sub-qty-note{display:inline;font-size:10.5px;color:#b7c0d4;font-weight:400;margin-left:5px;}
-  .two-col .field{flex:1;}
 
   .submit-btn{
     width:100%;
@@ -10353,15 +10367,39 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
       <div id="inFields">
         <div class="field">
-          <label>จำนวนการตรวจสอบ <span class="req">*</span><span class="hint hint-inline">√N+1 (กล่อง/ม้วน)</span></label>
-          <div class="sub-qty-row">
+          <div class="qty-header-row">
+            <label class="shrink-check-row">
+              <input type="checkbox" id="shrinkToggle" onchange="onShrinkToggle(this)">
+              <span>Shrink (kg)</span>
+            </label>
+          </div>
+          <div class="sub-qty-row" id="inQtyNormal">
             <div class="sub-qty-item">
-              <span class="sub-qty-label">จำนวนกล่องเต็ม(กล่อง)</span>
+              <label>จำนวนกล่องเต็ม(กล่อง)<span class="hint hint-inline">√N+1 (ไม่รวมกล่องเศษ)</span></label>
               <input type="number" min="0" id="inspectQtyBox" placeholder="ระบุจำนวน">
             </div>
             <div class="sub-qty-item">
-              <span class="sub-qty-label">จำนวนชิ้นในกล่องเศษ(ชิ้น)<span class="sub-qty-note">ไม่มีใส่ "0"</span></span>
-              <input type="number" min="0" id="inspectQtyPiece" placeholder="ระบุจำนวน">
+              <label>จำนวนชิ้นในกล่อง<u>เต็ม</u> (ชิ้น) <span class="req">*</span></label>
+              <input type="number" min="0" id="inspectPackSize" placeholder="ระบุจำนวน">
+            </div>
+          </div>
+
+          <div id="inQtyShrink" style="display:none;">
+            <div class="sub-qty-row">
+              <div class="sub-qty-item">
+                <label>จำนวนกล่องเต็ม(กล่อง)<span class="hint hint-inline">√N+1 (ไม่รวมกล่องเศษ)</span></label>
+                <input type="number" min="0" id="shrinkInBox" placeholder="ระบุจำนวน">
+              </div>
+              <div class="sub-qty-item">
+                <label>น้ำหนักกล่องเต็ม</label>
+                <div class="weight-input-row">
+                  <input type="number" min="0" step="0.01" id="shrinkInFullWeight" placeholder="ระบุน้ำหนัก">
+                  <select id="shrinkInFullWeightUnit">
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                  </select>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -10369,27 +10407,77 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
       <div id="outFields" style="display:none;">
         <div class="field">
-          <label>จำนวนการตรวจสอบ <span class="req">*</span><span class="hint hint-inline">√N+1 (กล่อง/ม้วน)</span></label>
-          <div class="sub-qty-row">
+          <div class="qty-header-row">
+            <label class="shrink-check-row">
+              <input type="checkbox" id="shrinkToggleOut" onchange="onShrinkToggle(this)">
+              <span>Shrink (kg)</span>
+            </label>
+          </div>
+          <div class="sub-qty-row" id="outQtyNormal">
             <div class="sub-qty-item">
-              <span class="sub-qty-label">จำนวนกล่องเต็ม(กล่อง)</span>
+              <label>จำนวนกล่อง<u>เต็ม</u>(กล่อง)<span class="hint hint-inline">√N+1 (ไม่รวมกล่องเศษ)</span></label>
               <input type="number" min="0" id="outQtyBox" placeholder="ระบุจำนวน">
             </div>
             <div class="sub-qty-item">
-              <span class="sub-qty-label">จำนวนชิ้นในกล่องเศษ(ชิ้น)<span class="sub-qty-note">ไม่มีใส่ "0"</span></span>
+              <label>จำนวนชิ้นในกล่อง<u>เศษ</u>(ชิ้น)<span class="hint hint-inline">ไม่มีใส่ "0"</span></label>
               <input type="number" min="0" id="outQtyPiece" placeholder="ระบุจำนวน">
             </div>
           </div>
-        </div>
-        <div class="field">
-          <label>Sample Usage (ชิ้น) <span class="req">*</span><span class="hint">จำนวนการใช้ตัวอย่างทดสอบ</span></label>
-          <input type="number" min="0" id="usageQty" placeholder="ระบุจำนวน">
+
+          <div id="outQtyShrink" style="display:none;">
+            <div class="sub-qty-row">
+              <div class="sub-qty-item">
+                <label>จำนวนกล่องเต็ม(กล่อง)<span class="hint hint-inline">√N+1 (ไม่รวมกล่องเศษ)</span></label>
+                <input type="number" min="0" id="shrinkOutBox" placeholder="ระบุจำนวน">
+              </div>
+              <div class="sub-qty-item">
+                <label>น้ำหนักกล่องเศษ <span class="req">*</span><span class="hint hint-inline">หลังตัด Test</span></label>
+                <div class="weight-input-row">
+                  <input type="number" min="0" step="0.01" id="shrinkOutPartialWeight" placeholder="ระบุน้ำหนัก">
+                  <select id="shrinkOutPartialWeightUnit">
+                    <option value="kg">kg</option>
+                    <option value="g">g</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="field">
-        <label>Sampling by (ลงชื่อ) <span class="req">*</span></label>
-        <input type="text" id="inspector" required>
+      <div class="two-col">
+        <div class="field" id="inspectPieceWrap">
+          <label>จำนวนชิ้นในกล่อง<u>เศษ</u>(ชิ้น)<span class="hint hint-inline">ไม่มีใส่ "0"</span></label>
+          <input type="number" min="0" id="inspectQtyPiece" placeholder="ระบุจำนวน">
+        </div>
+        <div class="field" id="shrinkInPartialWrap" style="display:none;">
+          <label>น้ำหนักกล่องเศษ <span class="req">*</span></label>
+          <div class="weight-input-row">
+            <input type="number" min="0" step="0.01" id="shrinkInPartialWeight" placeholder="ระบุน้ำหนัก">
+            <select id="shrinkInPartialWeightUnit">
+              <option value="kg">kg</option>
+              <option value="g">g</option>
+            </select>
+          </div>
+        </div>
+        <div class="field" id="sampleUsageWrap" style="display:none;">
+          <label>Sample Usage (ชิ้น) <span class="req">*</span><span class="hint hint-inline">จำนวนที่ตัด Test</span></label>
+          <input type="number" min="0" id="usageQty" placeholder="ระบุจำนวน">
+        </div>
+        <div class="field" id="sampleUsageShrinkWrap" style="display:none;">
+          <label>Sample Usage <span class="req">*</span><span class="hint hint-inline">น้ำหนักตัวอย่างที่ตัด Test</span></label>
+          <div class="weight-input-row">
+            <input type="number" min="0" step="0.01" id="usageQtyShrink" placeholder="ระบุน้ำหนัก">
+            <select id="usageQtyShrinkUnit">
+              <option value="kg">kg</option>
+              <option value="g">g</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Sampling by (ลงชื่อ) <span class="req">*</span></label>
+          <input type="text" id="inspector" required>
+        </div>
       </div>
 
       <div class="field">
@@ -10397,7 +10485,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         <textarea id="remark" rows="2" placeholder="Enter your answer"></textarea>
       </div>
 
-      <button type="submit" class="submit-btn" id="submitBtn">Submit</button>
+      <button type="submit" class="submit-btn" id="submitBtn">บันทึกข้อมูล</button>
       <div class="alert" id="alertBox"></div>
     </form>
   </div>
@@ -10472,10 +10560,14 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 // ===== CONFIG =====
 // วาง URL ของ Google Apps Script Web App ที่ deploy แล้วตรงนี้
 const CONFIG = {
-  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbyU0JJ90twjOFJzflto2-LL2q88eKjLSbfL49QYP3-8VnL6I0GaxrI8LbfmE7dmVciPNg/exec"
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbz5PMpUvAoODB9wXrj9Q6j-I6GP16jR-6821-hV_YZnVIqss118wr7oQDRypL3aSPR3pA/exec"
 };
 
 let direction = 'in';
+
+function isShrink(){
+  return document.getElementById('shrinkToggle').checked || document.getElementById('shrinkToggleOut').checked;
+}
 
 function setDirection(dir){
   direction = dir;
@@ -10483,12 +10575,45 @@ function setDirection(dir){
   document.getElementById('btnOut').className = dir==='out' ? 'active-out' : '';
   document.getElementById('inFields').style.display = dir==='in' ? 'block' : 'none';
   document.getElementById('outFields').style.display = dir==='out' ? 'block' : 'none';
+  refreshFieldVisibility();
 }
 
+// สลับชุดฟิลด์ตามทั้งทิศทาง (เข้า/ออก) และสถานะ Shrink checkbox ร่วมกัน
+function refreshFieldVisibility(){
+  const dir = direction;
+  const shrink = isShrink();
+
+  document.getElementById('inQtyNormal').style.display = (dir==='in' && !shrink) ? 'flex' : 'none';
+  document.getElementById('inQtyShrink').style.display = (dir==='in' && shrink) ? 'block' : 'none';
+  document.getElementById('outQtyNormal').style.display = (dir==='out' && !shrink) ? 'flex' : 'none';
+  document.getElementById('outQtyShrink').style.display = (dir==='out' && shrink) ? 'block' : 'none';
+
+  document.getElementById('inspectPieceWrap').style.display = (dir==='in' && !shrink) ? 'block' : 'none';
+  document.getElementById('shrinkInPartialWrap').style.display = (dir==='in' && shrink) ? 'block' : 'none';
+  document.getElementById('sampleUsageWrap').style.display = (dir==='out' && !shrink) ? 'block' : 'none';
+  document.getElementById('sampleUsageShrinkWrap').style.display = (dir==='out' && shrink) ? 'block' : 'none';
+}
+
+function onShrinkToggle(sourceEl){
+  const checked = sourceEl ? sourceEl.checked : isShrink();
+  document.getElementById('shrinkToggle').checked = checked;
+  document.getElementById('shrinkToggleOut').checked = checked;
+  refreshFieldVisibility();
+}
+
+let alertHideTimer = null;
 function showAlert(msg, success){
   const box = document.getElementById('alertBox');
   box.textContent = msg;
   box.className = 'alert show' + (success ? ' success' : '');
+
+  if(alertHideTimer) clearTimeout(alertHideTimer);
+  if(success){
+    // ข้อความสำเร็จให้ขึ้นแค่ชั่วคราว กันสับสนว่ากดส่งไปแล้วหรือยัง
+    alertHideTimer = setTimeout(function(){
+      box.className = 'alert';
+    }, 3000);
+  }
 }
 
 // รวมค่า "จำนวนกล่อง" และ "จำนวนชิ้น (กล่องเศษ)" เป็นข้อความเดียวสำหรับบันทึกลงคอลัมน์เดียวในชีท
@@ -10497,6 +10622,28 @@ function formatQty_(boxVal, pieceVal){
   const piece = pieceVal ? Number(pieceVal) : 0;
   if(piece > 0) return box + ' กล่อง ' + piece + ' ชิ้น';
   return box + ' กล่อง';
+}
+
+// ใช้เฉพาะตอนขาเข้า: ถ้ามีการกรอก Pack Size (จำนวนชิ้นในกล่องเต็ม) จะแปลงเป็น
+// "(12 กล่อง*72)+28 ชิ้น" แทน เพื่อให้เห็นจำนวนชิ้นรวมจริงในกล่องเต็มด้วย
+// ถ้าไม่ได้กรอก Pack Size จะใช้รูปแบบเดิม "12 กล่อง 28 ชิ้น"
+function formatQtyIn_(boxVal, pieceVal, packSizeVal){
+  const box = boxVal ? Number(boxVal) : 0;
+  const piece = pieceVal ? Number(pieceVal) : 0;
+  const packSize = packSizeVal ? Number(packSizeVal) : 0;
+
+  if(packSize > 0){
+    let text = '(' + box + ' กล่อง*' + packSize + ')';
+    if(piece > 0) text += '+' + piece + ' ชิ้น';
+    return text;
+  }
+  return formatQty_(boxVal, pieceVal);
+}
+
+// สำหรับงาน Shrink (หน่วยน้ำหนัก): "(3กล่อง*20kg)+15kg"
+function formatShrinkIn_(boxVal, fullWeightVal, fullWeightUnit, partialWeightVal, partialWeightUnit){
+  const box = boxVal ? Number(boxVal) : 0;
+  return '(' + box + 'กล่อง*' + fullWeightVal + fullWeightUnit + ')+' + partialWeightVal + partialWeightUnit;
 }
 
 async function handleSubmit(e){
@@ -10512,22 +10659,58 @@ async function handleSubmit(e){
   let payload = {
     action: 'submit',
     direction: direction === 'in' ? 'เข้า (IN)' : 'ออก (OUT)',
-    materialCode, batchNo, location, inspector, remark
+    materialCode, batchNo, location, inspector, remark,
+    shrink: isShrink()
   };
 
   if(direction === 'in'){
-    const box = document.getElementById('inspectQtyBox').value;
-    const piece = document.getElementById('inspectQtyPiece').value;
-    if(!box){ showAlert('กรุณาระบุจำนวนกล่อง', false); return; }
-    payload.samplingSizeIn = formatQty_(box, piece);
+    if(isShrink()){
+      const box = document.getElementById('shrinkInBox').value;
+      const fullWeight = document.getElementById('shrinkInFullWeight').value;
+      const fullWeightUnit = document.getElementById('shrinkInFullWeightUnit').value;
+      const partialWeight = document.getElementById('shrinkInPartialWeight').value;
+      const partialWeightUnit = document.getElementById('shrinkInPartialWeightUnit').value;
+      if(!box){ showAlert('กรุณาระบุจำนวนกล่องเต็ม', false); return; }
+      if(!fullWeight){ showAlert('กรุณาระบุน้ำหนักกล่องเต็ม', false); return; }
+      if(!partialWeight){ showAlert('กรุณาระบุน้ำหนักกล่องเศษ', false); return; }
+      payload.samplingSizeIn = formatShrinkIn_(box, fullWeight, fullWeightUnit, partialWeight, partialWeightUnit);
+    } else {
+      const box = document.getElementById('inspectQtyBox').value;
+      const packSize = document.getElementById('inspectPackSize').value;
+      const piece = document.getElementById('inspectQtyPiece').value;
+      if(!box){ showAlert('กรุณาระบุจำนวนกล่อง', false); return; }
+      if(!packSize){ showAlert('กรุณาระบุจำนวนชิ้นในกล่องเต็ม (Pack Size)', false); return; }
+      payload.samplingSizeIn = formatQtyIn_(box, piece, packSize);
+      payload.packSize = packSize;
+      payload.inBox = box;
+      payload.inPiece = piece || '0';
+    }
   } else {
-    const box = document.getElementById('outQtyBox').value;
-    const piece = document.getElementById('outQtyPiece').value;
-    const usageQty = document.getElementById('usageQty').value;
-    if(!box){ showAlert('กรุณาระบุจำนวนกล่อง', false); return; }
-    if(!usageQty){ showAlert('กรุณาระบุ Sample Usage', false); return; }
-    payload.samplingSizeOut = formatQty_(box, piece);
-    payload.sampleUsage = usageQty;
+    if(isShrink()){
+      const box = document.getElementById('shrinkOutBox').value;
+      const partialWeight = document.getElementById('shrinkOutPartialWeight').value;
+      const partialWeightUnit = document.getElementById('shrinkOutPartialWeightUnit').value;
+      const usageWeight = document.getElementById('usageQtyShrink').value;
+      const usageWeightUnit = document.getElementById('usageQtyShrinkUnit').value;
+      if(!box){ showAlert('กรุณาระบุจำนวนกล่องเต็ม', false); return; }
+      if(!partialWeight){ showAlert('กรุณาระบุน้ำหนักกล่องเศษ', false); return; }
+      if(!usageWeight){ showAlert('กรุณาระบุ Sample Usage', false); return; }
+      payload.outBox = box;
+      payload.outPartialWeight = partialWeight;
+      payload.outPartialWeightUnit = partialWeightUnit;
+      payload.sampleUsage = usageWeight;
+      payload.sampleUsageUnit = usageWeightUnit;
+    } else {
+      const box = document.getElementById('outQtyBox').value;
+      const piece = document.getElementById('outQtyPiece').value;
+      const usageQty = document.getElementById('usageQty').value;
+      if(!box){ showAlert('กรุณาระบุจำนวนกล่อง', false); return; }
+      if(!usageQty){ showAlert('กรุณาระบุ Sample Usage', false); return; }
+      payload.samplingSizeOut = formatQty_(box, piece);
+      payload.sampleUsage = usageQty;
+      payload.outBox = box;
+      payload.outPiece = piece || '0';
+    }
   }
 
   if(!materialCode || !batchNo || !location || !inspector){
@@ -10561,7 +10744,7 @@ async function handleSubmit(e){
     showAlert('เกิดข้อผิดพลาดในการส่งข้อมูล: Failed to fetch', false);
   }finally{
     btn.disabled = false;
-    btn.textContent = 'Submit';
+    btn.textContent = 'บันทึกข้อมูล';
   }
 }
 

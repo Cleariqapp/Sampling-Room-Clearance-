@@ -10627,12 +10627,17 @@ function formatQty_(boxVal, pieceVal){
 // ใช้เฉพาะตอนขาเข้า: ถ้ามีการกรอก Pack Size (จำนวนชิ้นในกล่องเต็ม) จะแปลงเป็น
 // "(12 กล่อง*72)+28 ชิ้น" แทน เพื่อให้เห็นจำนวนชิ้นรวมจริงในกล่องเต็มด้วย
 // ถ้าไม่ได้กรอก Pack Size จะใช้รูปแบบเดิม "12 กล่อง 28 ชิ้น"
+// ใช้เฉพาะตอนขาเข้า: ถ้ามีการกรอก Pack Size (จำนวนชิ้นในกล่องเต็ม) จะแปลงเป็น
+// "(12 กล่อง*72)+28 ชิ้น" แทน เพื่อให้เห็นจำนวนชิ้นรวมจริงในกล่องเต็มด้วย
+// Pack Size = 0 ใช้ได้ปกติถ้าไม่มีกล่องเต็มเลย (มีแต่กล่องเศษ) เพราะ 0 กล่อง x เท่าไหร่ก็ = 0
+// ไม่กระทบผลรวม แต่ถ้ามีกล่องเต็มจริง (box > 0) Pack Size ต้องมากกว่า 0 เท่านั้น (เช็คตอน validate ก่อน submit)
 function formatQtyIn_(boxVal, pieceVal, packSizeVal){
   const box = boxVal ? Number(boxVal) : 0;
   const piece = pieceVal ? Number(pieceVal) : 0;
-  const packSize = packSizeVal ? Number(packSizeVal) : 0;
+  const hasPackSize = packSizeVal !== '' && packSizeVal !== null && packSizeVal !== undefined;
+  const packSize = hasPackSize ? Number(packSizeVal) : null;
 
-  if(packSize > 0){
+  if(packSize !== null && (box === 0 || packSize > 0)){
     let text = '(' + box + ' กล่อง*' + packSize + ')';
     if(piece > 0) text += '+' + piece + ' ชิ้น';
     return text;
@@ -10676,10 +10681,15 @@ async function handleSubmit(e){
       payload.samplingSizeIn = formatShrinkIn_(box, fullWeight, fullWeightUnit, partialWeight, partialWeightUnit);
     } else {
       const box = document.getElementById('inspectQtyBox').value;
-      const packSize = document.getElementById('inspectPackSize').value;
+      let packSize = document.getElementById('inspectPackSize').value;
       const piece = document.getElementById('inspectQtyPiece').value;
       if(!box){ showAlert('กรุณาระบุจำนวนกล่อง', false); return; }
-      if(!packSize){ showAlert('กรุณาระบุจำนวนชิ้นในกล่องเต็ม (Pack Size)', false); return; }
+      if(Number(box) === 0 && Number(packSize) === 0){
+        // ไม่มีกล่องเต็มเลย (มีแต่กล่องเศษ) -> เติม Pack Size เป็น 1 ให้อัตโนมัติ ไม่กระทบผลรวม
+        packSize = '1';
+      } else if(Number(packSize) <= 0){
+        showAlert('กรุณาระบุ Pack Size ให้มากกว่า 0 เมื่อมีกล่องเต็ม', false); return;
+      }
       payload.samplingSizeIn = formatQtyIn_(box, piece, packSize);
       payload.packSize = packSize;
       payload.inBox = box;

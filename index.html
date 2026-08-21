@@ -10169,7 +10169,11 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   }
 
   .toggle{
-    display:flex;gap:12px;margin-bottom:22px;
+    display:flex;gap:12px;margin-bottom:10px;
+  }
+  .choose-direction-hint{
+    text-align:center;font-size:13px;color:var(--muted);
+    background:#f5f7fc;border-radius:10px;padding:10px 12px;margin:0 0 22px;
   }
   .toggle button{
     flex:1;
@@ -10333,15 +10337,16 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 
   <div class="card">
     <div class="toggle">
-      <button id="btnIn" class="active-in" onclick="setDirection('in')">เข้า<small>(IN)</small></button>
+      <button id="btnIn" onclick="setDirection('in')">เข้า<small>(IN)</small></button>
       <button id="btnOut" onclick="setDirection('out')">ออก<small>(OUT)</small></button>
     </div>
+    <p class="choose-direction-hint" id="chooseDirectionHint">กรุณาเลือก เข้า (IN) หรือ ออก (OUT) ก่อนเริ่มกรอกข้อมูล</p>
 
     <form id="clearanceForm" onsubmit="return handleSubmit(event)">
       <div class="field code-row">
         <div class="field">
           <label>Material Code <span class="req">*</span></label>
-          <input type="text" id="materialCode" required>
+          <input type="text" id="materialCode" required onpaste="handleMaterialCodePaste(event)">
         </div>
         <button type="button" class="qr-btn" onclick="openQrModal()">📷 สแกน QR</button>
       </div>
@@ -10365,7 +10370,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         </select>
       </div>
 
-      <div id="inFields">
+      <div id="inFields" style="display:none;">
         <div class="field">
           <div class="qty-header-row">
             <label class="shrink-check-row">
@@ -10476,7 +10481,17 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
         </div>
         <div class="field">
           <label>Sampling by (ลงชื่อ) <span class="req">*</span></label>
-          <input type="text" id="inspector" required>
+          <input type="text" id="inspector" list="inspectorList" autocomplete="off" required>
+          <datalist id="inspectorList">
+            <option value="วิไลพร">
+            <option value="หนึ่งฤทัย">
+            <option value="ปริศนา">
+            <option value="นฤมล">
+            <option value="ปัทมา">
+            <option value="ดวงพร">
+            <option value="บุญเอื้อ">
+            <option value="สุวิมล">
+          </datalist>
         </div>
       </div>
 
@@ -10563,7 +10578,7 @@ const CONFIG = {
   SCRIPT_URL: "https://script.google.com/macros/s/AKfycbz5PMpUvAoODB9wXrj9Q6j-I6GP16jR-6821-hV_YZnVIqss118wr7oQDRypL3aSPR3pA/exec"
 };
 
-let direction = 'in';
+let direction = null;
 
 function isShrink(){
   return document.getElementById('shrinkToggle').checked || document.getElementById('shrinkToggleOut').checked;
@@ -10575,6 +10590,7 @@ function setDirection(dir){
   document.getElementById('btnOut').className = dir==='out' ? 'active-out' : '';
   document.getElementById('inFields').style.display = dir==='in' ? 'block' : 'none';
   document.getElementById('outFields').style.display = dir==='out' ? 'block' : 'none';
+  document.getElementById('chooseDirectionHint').style.display = dir ? 'none' : 'block';
   refreshFieldVisibility();
 }
 
@@ -10654,6 +10670,11 @@ function formatShrinkIn_(boxVal, fullWeightVal, fullWeightUnit, partialWeightVal
 async function handleSubmit(e){
   e.preventDefault();
   const btn = document.getElementById('submitBtn');
+
+  if(!direction){
+    showAlert('กรุณาเลือก เข้า (IN) หรือ ออก (OUT) ก่อนกดส่งข้อมูล', false);
+    return;
+  }
 
   const materialCode = document.getElementById('materialCode').value.trim();
   const batchNo = document.getElementById('batchNo').value.trim();
@@ -10746,7 +10767,7 @@ async function handleSubmit(e){
     if(data.status === 'ok'){
       showAlert('บันทึกข้อมูลสำเร็จ', true);
       document.getElementById('clearanceForm').reset();
-      setDirection('in');
+      setDirection(null);
     } else {
       showAlert('เกิดข้อผิดพลาดในการส่งข้อมูล: ' + (data.message || 'unknown error'), false);
     }
@@ -10873,6 +10894,20 @@ function applyQRResult(raw){
   const { materialCode, batchNo } = parseQRData(raw);
   if(materialCode) document.getElementById('materialCode').value = materialCode;
   if(batchNo) document.getElementById('batchNo').value = batchNo;
+}
+
+// เผื่อกรณีกล้องสแกนในหน้านี้ใช้ไม่ได้บนบางเครื่อง แต่แอปสแกน QR ของตัวเครื่องเองใช้ได้ปกติ
+// ผู้ใช้สามารถสแกนด้วยแอปเครื่อง คัดลอกข้อความที่ได้ แล้ว "วาง" ลงช่อง Material Code แทน
+// ถ้าข้อความที่วางตรงรูปแบบ Q:... ระบบจะแยก Material Code / Batch No ให้อัตโนมัติเหมือนสแกนเอง
+function handleMaterialCodePaste(event){
+  const pasted = (event.clipboardData || window.clipboardData).getData('text');
+  const text = (pasted || '').trim();
+  const parts = text.split(':');
+  if(parts.length >= 7 && parts[0].toUpperCase() === 'Q'){
+    event.preventDefault();
+    applyQRResult(text);
+  }
+  // ถ้าไม่ตรงรูปแบบ Q:... ปล่อยให้วางข้อความตามปกติ (เช่น วาง Material Code เฉยๆ)
 }
 
 // ===== QR scan modal (live camera) =====

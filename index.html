@@ -10297,6 +10297,20 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   .status-result span.k{color:var(--muted);font-weight:600;margin-right:4px;}
   .status-loading{font-size:13px;color:var(--muted);}
 
+  /* Balance warning modal */
+  .balance-warn-msg{
+    background:var(--danger-bg);color:var(--danger-text);font-weight:700;font-size:14px;
+    padding:12px 14px;border-radius:10px;margin-bottom:12px;
+  }
+  .balance-warn-in-box{
+    background:#f5f7fc;border:1px solid var(--border);border-radius:10px;
+    padding:12px 14px;font-size:13px;color:var(--ink);margin-bottom:12px;line-height:1.7;
+  }
+  .balance-warn-in-box b{color:var(--primary);}
+  .balance-warn-hint{font-size:12px;color:var(--muted);margin:0 0 16px;text-align:center;}
+  .balance-warn-actions{display:flex;gap:10px;}
+  .balance-warn-actions button{flex:1;}
+
   /* QR scanner modal */
   .qr-modal video{width:100%;border-radius:10px;background:#000;}
   .qr-hint{font-size:12px;color:var(--muted);margin-top:8px;text-align:center;}
@@ -10552,6 +10566,38 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
   </div>
 </div>
 
+<!-- Balance Warning Modal -->
+<div class="overlay" id="balanceWarnOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3>⚠️ นำออกไม่ถูกต้องโปรดตรวจสอบ</h3>
+      <button class="modal-close" onclick="closeBalanceWarnModal(false)">✕</button>
+    </div>
+    <div class="balance-warn-msg" id="balanceWarnMsg"></div>
+    <div class="balance-warn-in-box" id="balanceWarnInBox"></div>
+    <p class="balance-warn-hint">ลองเช็คว่าข้อมูลขาเข้าที่เคยกรอกไว้ถูกต้องไหม หรือจะยืนยันส่งข้อมูลขาออกนี้ต่อก็ได้</p>
+    <div class="balance-warn-actions">
+      <button type="button" class="qr-live-btn" onclick="closeBalanceWarnModal(false)">แก้ไขข้อมูล</button>
+      <button type="button" class="qr-photo-btn" onclick="closeBalanceWarnModal(true)">ยืนยันส่งข้อมูล</button>
+    </div>
+  </div>
+</div>
+
+<!-- Generic Confirm Warning Modal (แทน confirm() ของเบราว์เซอร์) -->
+<div class="overlay" id="confirmWarnOverlay">
+  <div class="modal">
+    <div class="modal-head">
+      <h3 id="confirmWarnTitle">⚠️ แจ้งเตือน</h3>
+      <button class="modal-close" onclick="closeConfirmWarnModal(false)">✕</button>
+    </div>
+    <div class="balance-warn-msg" id="confirmWarnMsg"></div>
+    <div class="balance-warn-actions">
+      <button type="button" class="qr-live-btn" onclick="closeConfirmWarnModal(false)">ยกเลิก</button>
+      <button type="button" class="qr-photo-btn" onclick="closeConfirmWarnModal(true)">ยืนยันส่งข้อมูล</button>
+    </div>
+  </div>
+</div>
+
 <!-- QR Modal -->
 <div class="overlay" id="qrOverlay">
   <div class="modal qr-modal">
@@ -10575,7 +10621,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 // ===== CONFIG =====
 // วาง URL ของ Google Apps Script Web App ที่ deploy แล้วตรงนี้
 const CONFIG = {
-  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbz5PMpUvAoODB9wXrj9Q6j-I6GP16jR-6821-hV_YZnVIqss118wr7oQDRypL3aSPR3pA/exec"
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzdcu-R3GZ-WmfHYMdOFLRp2_MmhU1A0agHNTMq-u-qj4mLAomNYoSCJpwfPdTUDWZJtw/exec"
 };
 
 let direction = null;
@@ -10755,6 +10801,73 @@ async function handleSubmit(e){
   }
 
   btn.disabled = true;
+
+  if(direction === 'in'){
+    btn.textContent = 'กำลังตรวจสอบ...';
+    try{
+      const checkUrl = CONFIG.SCRIPT_URL + '?action=checkInExists&location=' + encodeURIComponent(location) + '&materialCode=' + encodeURIComponent(materialCode) + '&batchNo=' + encodeURIComponent(batchNo);
+      const checkRes = await fetch(checkUrl);
+      const checkData = await checkRes.json();
+      if(checkData.status === 'ok' && checkData.found){
+        const timeText = checkData.time ? (' (เมื่อ ' + checkData.time + ')') : '';
+        const proceed = await showConfirmWarnModal('⚠️ แจ้งเตือน', 'Material Code + Batch No นี้ เคยกรอกขาเข้าไปแล้ว' + timeText + ' ต้องการส่งข้อมูลซ้ำอีกครั้งหรือไม่?');
+        if(!proceed){
+          btn.disabled = false;
+          btn.textContent = 'บันทึกข้อมูล';
+          return;
+        }
+      }
+    }catch(err){
+      // เช็คไม่สำเร็จ (เช่น เน็ตมีปัญหา ชั่วคราว) ไม่บล็อกการทำงาน ปล่อยให้ส่งข้อมูลต่อตามปกติ
+    }
+  }
+
+  if(direction === 'out'){
+    btn.textContent = 'กำลังตรวจสอบ...';
+    try{
+      let checkUrl = CONFIG.SCRIPT_URL + '?action=checkOutStatus&location=' + encodeURIComponent(location) + '&materialCode=' + encodeURIComponent(materialCode) + '&batchNo=' + encodeURIComponent(batchNo);
+      checkUrl += '&sampleUsage=' + encodeURIComponent(payload.sampleUsage || '');
+      if(payload.sampleUsageUnit) checkUrl += '&sampleUsageUnit=' + encodeURIComponent(payload.sampleUsageUnit);
+      checkUrl += '&outBox=' + encodeURIComponent(payload.outBox || '');
+      if(payload.outPiece !== undefined) checkUrl += '&outPiece=' + encodeURIComponent(payload.outPiece);
+      if(payload.outPartialWeight !== undefined) checkUrl += '&outPartialWeight=' + encodeURIComponent(payload.outPartialWeight);
+      if(payload.outPartialWeightUnit) checkUrl += '&outPartialWeightUnit=' + encodeURIComponent(payload.outPartialWeightUnit);
+
+      const checkRes = await fetch(checkUrl);
+      const checkData = await checkRes.json();
+
+      if(checkData.status === 'ok'){
+        if(!checkData.hasIn){
+          const proceedIn = await showConfirmWarnModal('⚠️ แจ้งเตือน', 'คุณลืมกรอกข้อมูลขาเข้ารายการนี้หรือเปล่า? หรืออาจพิมพ์ Code/Batch/อาคาร ผิด อย่าลืมเช็คสถานะก่อนนะ ยืนยันที่จะส่งข้อมูลขาออกรายการนี้หรือไม่');
+          if(!proceedIn){
+            btn.disabled = false;
+            btn.textContent = 'บันทึกข้อมูล';
+            return;
+          }
+        }
+        if(checkData.hasOut){
+          const timeText = checkData.outTime ? (' (เมื่อ ' + checkData.outTime + ')') : '';
+          const proceedOut = await showConfirmWarnModal('⚠️ แจ้งเตือน', 'Material Code + Batch No นี้ มีข้อมูลขาออกบันทึกไว้แล้ว' + timeText + ' ต้องการส่งข้อมูลซ้ำอีกครั้งหรือไม่?');
+          if(!proceedOut){
+            btn.disabled = false;
+            btn.textContent = 'บันทึกข้อมูล';
+            return;
+          }
+        }
+        if(checkData.balanceKnown && !checkData.balanced){
+          const proceedBalance = await openBalanceWarnModal(checkData.balanceMsg, checkData.inTime, checkData.inInspector, checkData.inText);
+          if(!proceedBalance){
+            btn.disabled = false;
+            btn.textContent = 'บันทึกข้อมูล';
+            return;
+          }
+        }
+      }
+    }catch(err){
+      // เช็คไม่สำเร็จ (เช่น เน็ตมีปัญหา ชั่วคราว) ไม่บล็อกการทำงาน ปล่อยให้ส่งข้อมูลต่อตามปกติ
+    }
+  }
+
   btn.textContent = 'กำลังบันทึก...';
 
   try{
@@ -10831,6 +10944,49 @@ function openCheckModal(){
 function closeCheckModal(){
   document.getElementById('checkOverlay').classList.remove('show');
 }
+
+// ===== Balance Warning modal (แสดงตอนขาออกคำนวณแล้วพบว่า Balance ไม่ตรง) =====
+// คืนค่าเป็น Promise<boolean> — true = ผู้ใช้เลือก "ยืนยันส่งข้อมูล", false = เลือก "แก้ไขข้อมูล" (ยกเลิก)
+let balanceWarnResolve_ = null;
+function openBalanceWarnModal(balanceMsg, inTime, inInspector, inText){
+  document.getElementById('balanceWarnMsg').textContent = '❌ ' + balanceMsg;
+  const inBox = document.getElementById('balanceWarnInBox');
+  inBox.innerHTML =
+    '<div><b>ข้อมูลขาเข้าที่เคยกรอกไว้</b></div>' +
+    '<div>วันที่เวลา: ' + (inTime || '-') + '</div>' +
+    '<div>ผู้กรอกขาเข้า: ' + (inInspector || '-') + '</div>' +
+    '<div>Sampling Size (เข้า): ' + (inText || '-') + '</div>';
+  document.getElementById('balanceWarnOverlay').classList.add('show');
+  return new Promise(function(resolve){
+    balanceWarnResolve_ = resolve;
+  });
+}
+function closeBalanceWarnModal(confirmed){
+  document.getElementById('balanceWarnOverlay').classList.remove('show');
+  if(balanceWarnResolve_){
+    balanceWarnResolve_(confirmed);
+    balanceWarnResolve_ = null;
+  }
+}
+
+// ===== Generic Confirm Warning modal (แทน confirm() ของเบราว์เซอร์ ให้หน้าตาเหมือน Balance modal) =====
+let confirmWarnResolve_ = null;
+function showConfirmWarnModal(title, message){
+  document.getElementById('confirmWarnTitle').textContent = title;
+  document.getElementById('confirmWarnMsg').textContent = message;
+  document.getElementById('confirmWarnOverlay').classList.add('show');
+  return new Promise(function(resolve){
+    confirmWarnResolve_ = resolve;
+  });
+}
+function closeConfirmWarnModal(confirmed){
+  document.getElementById('confirmWarnOverlay').classList.remove('show');
+  if(confirmWarnResolve_){
+    confirmWarnResolve_(confirmed);
+    confirmWarnResolve_ = null;
+  }
+}
+
 async function checkBatchStatus(){
   const loc = document.getElementById('checkLocation').value;
   const batchNo = document.getElementById('checkBatchNo').value.trim();

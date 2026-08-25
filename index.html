@@ -10621,7 +10621,7 @@ function findAlignmentPattern(matrix, alignmentPatternQuads, topRight, topLeft, 
 // ===== CONFIG =====
 // วาง URL ของ Google Apps Script Web App ที่ deploy แล้วตรงนี้
 const CONFIG = {
-  SCRIPT_URL: "https://script.google.com/macros/s/AKfycbzdcu-R3GZ-WmfHYMdOFLRp2_MmhU1A0agHNTMq-u-qj4mLAomNYoSCJpwfPdTUDWZJtw/exec"
+  SCRIPT_URL: "https://script.google.com/macros/s/AKfycby_0S1DG66h5HO_M5Kslfb26rJjupfRVylbbcbrwJ_F21ZbET3UDPzx-Ks5bCaZajWkyg/exec"
 };
 
 let direction = null;
@@ -10801,82 +10801,47 @@ async function handleSubmit(e){
   }
 
   btn.disabled = true;
-
-  if(direction === 'in'){
-    btn.textContent = 'กำลังตรวจสอบ...';
-    try{
-      const checkUrl = CONFIG.SCRIPT_URL + '?action=checkInExists&location=' + encodeURIComponent(location) + '&materialCode=' + encodeURIComponent(materialCode) + '&batchNo=' + encodeURIComponent(batchNo);
-      const checkRes = await fetch(checkUrl);
-      const checkData = await checkRes.json();
-      if(checkData.status === 'ok' && checkData.found){
-        const timeText = checkData.time ? (' (เมื่อ ' + checkData.time + ')') : '';
-        const proceed = await showConfirmWarnModal('⚠️ แจ้งเตือน', 'Material Code + Batch No นี้ เคยกรอกขาเข้าไปแล้ว' + timeText + ' ต้องการส่งข้อมูลซ้ำอีกครั้งหรือไม่?');
-        if(!proceed){
-          btn.disabled = false;
-          btn.textContent = 'บันทึกข้อมูล';
-          return;
-        }
-      }
-    }catch(err){
-      // เช็คไม่สำเร็จ (เช่น เน็ตมีปัญหา ชั่วคราว) ไม่บล็อกการทำงาน ปล่อยให้ส่งข้อมูลต่อตามปกติ
-    }
-  }
-
-  if(direction === 'out'){
-    btn.textContent = 'กำลังตรวจสอบ...';
-    try{
-      let checkUrl = CONFIG.SCRIPT_URL + '?action=checkOutStatus&location=' + encodeURIComponent(location) + '&materialCode=' + encodeURIComponent(materialCode) + '&batchNo=' + encodeURIComponent(batchNo);
-      checkUrl += '&sampleUsage=' + encodeURIComponent(payload.sampleUsage || '');
-      if(payload.sampleUsageUnit) checkUrl += '&sampleUsageUnit=' + encodeURIComponent(payload.sampleUsageUnit);
-      checkUrl += '&outBox=' + encodeURIComponent(payload.outBox || '');
-      if(payload.outPiece !== undefined) checkUrl += '&outPiece=' + encodeURIComponent(payload.outPiece);
-      if(payload.outPartialWeight !== undefined) checkUrl += '&outPartialWeight=' + encodeURIComponent(payload.outPartialWeight);
-      if(payload.outPartialWeightUnit) checkUrl += '&outPartialWeightUnit=' + encodeURIComponent(payload.outPartialWeightUnit);
-
-      const checkRes = await fetch(checkUrl);
-      const checkData = await checkRes.json();
-
-      if(checkData.status === 'ok'){
-        if(!checkData.hasIn){
-          const proceedIn = await showConfirmWarnModal('⚠️ แจ้งเตือน', 'คุณลืมกรอกข้อมูลขาเข้ารายการนี้หรือเปล่า? หรืออาจพิมพ์ Code/Batch/อาคาร ผิด อย่าลืมเช็คสถานะก่อนนะ ยืนยันที่จะส่งข้อมูลขาออกรายการนี้หรือไม่');
-          if(!proceedIn){
-            btn.disabled = false;
-            btn.textContent = 'บันทึกข้อมูล';
-            return;
-          }
-        }
-        if(checkData.hasOut){
-          const timeText = checkData.outTime ? (' (เมื่อ ' + checkData.outTime + ')') : '';
-          const proceedOut = await showConfirmWarnModal('⚠️ แจ้งเตือน', 'Material Code + Batch No นี้ มีข้อมูลขาออกบันทึกไว้แล้ว' + timeText + ' ต้องการส่งข้อมูลซ้ำอีกครั้งหรือไม่?');
-          if(!proceedOut){
-            btn.disabled = false;
-            btn.textContent = 'บันทึกข้อมูล';
-            return;
-          }
-        }
-        if(checkData.balanceKnown && !checkData.balanced){
-          const proceedBalance = await openBalanceWarnModal(checkData.balanceMsg, checkData.inTime, checkData.inInspector, checkData.inText);
-          if(!proceedBalance){
-            btn.disabled = false;
-            btn.textContent = 'บันทึกข้อมูล';
-            return;
-          }
-        }
-      }
-    }catch(err){
-      // เช็คไม่สำเร็จ (เช่น เน็ตมีปัญหา ชั่วคราว) ไม่บล็อกการทำงาน ปล่อยให้ส่งข้อมูลต่อตามปกติ
-    }
-  }
-
   btn.textContent = 'กำลังบันทึก...';
 
   try{
-    const res = await fetch(CONFIG.SCRIPT_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload)
-    });
-    const data = await res.json();
+    let data = await postToScript_(payload);
+
+    if(data.status === 'confirm_needed'){
+      let allConfirmed = true;
+
+      for(const issue of (data.issues || [])){
+        let proceed = true;
+
+        if(issue.type === 'duplicateIn'){
+          const timeText = issue.time ? (' (เมื่อ ' + issue.time + ')') : '';
+          proceed = await showConfirmWarnModal('⚠️ แจ้งเตือน', 'Material Code + Batch No นี้ เคยกรอกขาเข้าไปแล้ว' + timeText + ' ต้องการส่งข้อมูลซ้ำอีกครั้งหรือไม่?');
+        } else if(issue.type === 'missingIn'){
+          proceed = await showConfirmWarnModal('⚠️ แจ้งเตือน', 'คุณลืมกรอกข้อมูลขาเข้ารายการนี้หรือเปล่า? หรืออาจพิมพ์ Code/Batch/อาคาร ผิด อย่าลืมเช็คสถานะก่อนนะ ยืนยันที่จะส่งข้อมูลขาออกรายการนี้หรือไม่');
+        } else if(issue.type === 'duplicateOut'){
+          const timeText = issue.time ? (' (เมื่อ ' + issue.time + ')') : '';
+          proceed = await showConfirmWarnModal('⚠️ แจ้งเตือน', 'Material Code + Batch No นี้ มีข้อมูลขาออกบันทึกไว้แล้ว' + timeText + ' ต้องการส่งข้อมูลซ้ำอีกครั้งหรือไม่?');
+        } else if(issue.type === 'balanceMismatch'){
+          proceed = await openBalanceWarnModal(issue.message, issue.inTime, issue.inInspector, issue.inText);
+        }
+
+        if(!proceed){
+          allConfirmed = false;
+          break;
+        }
+      }
+
+      if(!allConfirmed){
+        btn.disabled = false;
+        btn.textContent = 'บันทึกข้อมูล';
+        return;
+      }
+
+      // ผู้ใช้ยืนยันทุกอย่างแล้ว -> ส่งซ้ำอีกครั้งพร้อมบอกให้บันทึกจริงเลย ไม่ต้องเช็คซ้ำ
+      btn.textContent = 'กำลังบันทึก...';
+      payload.forceSubmit = true;
+      data = await postToScript_(payload);
+    }
+
     if(data.status === 'ok'){
       showAlert('บันทึกข้อมูลสำเร็จ', true);
       document.getElementById('clearanceForm').reset();
@@ -10890,6 +10855,15 @@ async function handleSubmit(e){
     btn.disabled = false;
     btn.textContent = 'บันทึกข้อมูล';
   }
+}
+
+async function postToScript_(payload){
+  const res = await fetch(CONFIG.SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  return await res.json();
 }
 
 // ===== Status modal =====
